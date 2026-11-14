@@ -209,8 +209,15 @@ func (cm *Docker) inspect(id string) (insp *api.Container, found bool, failed bo
 }
 
 func calcUptime(insp *api.Container) string {
+	// A container that was created but never started reports a zero
+	// StartedAt; subtracting it overflows time.Duration ("292 years").
+	if insp.State.StartedAt.IsZero() {
+		return ""
+	}
 	endTime := insp.State.FinishedAt
-	if endTime.IsZero() || insp.State.Running {
+	// FinishedAt is zero for a running container and older than StartedAt
+	// for one that was restarted, so only trust it for a stopped container.
+	if endTime.IsZero() || insp.State.Running || insp.State.Restarting || endTime.Before(insp.State.StartedAt) {
 		endTime = time.Now()
 	}
 	uptime := endTime.Sub(insp.State.StartedAt)
