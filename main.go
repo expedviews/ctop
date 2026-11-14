@@ -91,7 +91,16 @@ func main() {
 	}
 	ui.ColorMap = ColorMap // override default colormap
 	if err := ui.Init(); err != nil {
-		panic(err)
+		// A TERMINFO directory without an entry for $TERM (e.g. a terminal
+		// emulator's private terminfo dir inherited by tmux) makes termbox fail.
+		// Retry once with the system terminfo database before giving up.
+		if ti := os.Getenv("TERMINFO"); ti == "" {
+			panic(err)
+		}
+		os.Unsetenv("TERMINFO")
+		if err2 := ui.Init(); err2 != nil {
+			panic(err)
+		}
 	}
 	tm.SetInputMode(tm.InputAlt)
 
